@@ -40,11 +40,25 @@ async function waitForHealth(baseUrl, child, output) {
   throw new Error(`Timed out waiting for API health\n${output()}`);
 }
 
-async function startServer() {
+
+async function removeDatabaseFiles(dbPath) {
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    try {
+      for (const suffix of ['', '-shm', '-wal']) {
+        fs.rmSync(`${dbPath}${suffix}`, { force: true });
+      }
+      return;
+    } catch (error) {
+      if (attempt === 9 || error?.code !== 'EPERM') throw error;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+  }
+}
+async function startServer(envOverrides = {}) {
   const port = await getFreePort();
   const dbPath = path.join(tempDir, `community-hero-${process.pid}-${Date.now()}.db`);
-  const command = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-  const child = spawn(command, ['exec', 'tsx', 'server/index.ts'], {
+  const tsxCli = path.join(rootDir, 'node_modules', 'tsx', 'dist', 'cli.mjs');
+  const child = spawn(process.execPath, [tsxCli, 'server/index.ts'], {
     cwd: rootDir,
     env: {
       ...process.env,
@@ -52,6 +66,7 @@ async function startServer() {
       SERVER_PORT: String(port),
       JWT_SECRET: 'test-secret',
       GEMINI_API_KEY: '',
+      ...envOverrides,
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -73,9 +88,7 @@ async function startServer() {
         child.kill();
         await new Promise((resolve) => child.once('exit', resolve));
       }
-      for (const suffix of ['', '-shm', '-wal']) {
-        fs.rmSync(`${dbPath}${suffix}`, { force: true });
-      }
+      await removeDatabaseFiles(dbPath);
     },
   };
 }
@@ -105,6 +118,12 @@ test('API starts with security headers and seeded issues', async () => {
     const { response, body } = await request(server.baseUrl, '/api/issues');
     assert.equal(response.status, 200);
     assert.equal(body.issues.length, 4);
+
+    const paged = await request(server.baseUrl, '/api/issues?limit=2&page=2');
+    assert.equal(paged.response.status, 200);
+    assert.equal(paged.body.limit, 2);
+    assert.equal(paged.body.page, 2);
+    assert.equal(paged.body.issues.length, 2);
   } finally {
     await server.stop();
   }
@@ -118,6 +137,14 @@ test('auth validates input and returns safe user payloads', async () => {
       body: JSON.stringify({ name: 'Bad Email', email: 'not-an-email', password: 'secret1', role: 'Citizen' }),
     });
     assert.equal(invalid.response.status, 400);
+
+    const spoofedAuthority = await request(server.baseUrl, '/api/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({ name: 'Public Admin', email: 'public-admin@example.com', password: 'secret1', role: 'Authority' }),
+    });
+    assert.equal(spoofedAuthority.response.status, 201);
+    assert.equal(spoofedAuthority.body.user.role, 'Citizen');
+    assert.equal('password' in spoofedAuthority.body.user, false);
 
     const login = await request(server.baseUrl, '/api/auth/login', {
       method: 'POST',
@@ -187,6 +214,26 @@ test('issue lifecycle enforces auth, validation, and authority status changes', 
     assert.equal(statusUpdate.response.status, 200);
     assert.equal(statusUpdate.body.issue.status, 'Resolved');
     assert.equal(statusUpdate.body.issue.resolvedNotes, 'Crew repaired and secured the cover.');
+  } finally {
+    await server.stop();
+  }
+});
+
+test('production mode blocks database reset', async () => {
+  const server = await startServer({ NODE_ENV: 'production' });
+  try {
+    const authorityLogin = await request(server.baseUrl, '/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email: 'admin@hero.com', password: 'admin123' }),
+    });
+
+    const reset = await request(server.baseUrl, '/api/reset', {
+      method: 'POST',
+      headers: { authorization: `Bearer ${authorityLogin.body.token}` },
+    });
+
+    assert.equal(reset.response.status, 403);
+    assert.equal(reset.body.error, 'Database reset is disabled in production');
   } finally {
     await server.stop();
   }

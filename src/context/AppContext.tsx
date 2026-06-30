@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import type { Issue, User, ChatMessage, AppNotification, ToastData, AppTab, NewIssueInput, Badge } from '../types';
 import { INITIAL_ISSUES, MOCK_USERS, ALL_BADGES } from '../data/mockData';
 import { saveToStorage, loadFromStorage, clearAllStorage, STORAGE_KEYS } from '../services/storageService';
@@ -45,15 +46,26 @@ interface AppContextType {
   removeToast: (id: string) => void;
   
   resetDemo: () => void;
+  
+  isMobileMenuOpen: boolean;
+  setIsMobileMenuOpen: (isOpen: boolean) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const activeTab = (location.pathname === '/' ? 'landing' : location.pathname.substring(1)) as AppTab;
+  const setActiveTab = useCallback((tab: AppTab) => {
+    if (tab === 'landing') navigate('/');
+    else navigate(`/${tab}`);
+  }, [navigate]);
+
   const [user, setUser] = useState<User | null>(() => loadFromStorage(STORAGE_KEYS.CURRENT_USER, null));
   const [registeredUsers, setRegisteredUsers] = useState<User[]>(() => loadFromStorage('registeredUsers', MOCK_USERS));
-  const [activeTab, setActiveTab] = useState<AppTab>('landing');
   const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [issues, setIssues] = useState<Issue[]>(() => loadFromStorage(STORAGE_KEYS.ISSUES, INITIAL_ISSUES));
   const [upvotedIssues, setUpvotedIssues] = useState<Set<string>>(() => new Set(loadFromStorage(STORAGE_KEYS.USER_UPVOTES, [])));
   const [verifiedIssues, setVerifiedIssues] = useState<Set<string>>(() => new Set(loadFromStorage(STORAGE_KEYS.USER_VERIFICATIONS, [])));
@@ -158,7 +170,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         if (earned) {
           newBadges.push({ ...badge, dateEarned: new Date().toISOString() });
           badgesAdded = true;
-          addNotification('Badge Earned! 🏆', `You've earned the ${badge.name} badge!`, 'badge');
+          addNotification('Badge Earned', `You've earned the ${badge.name} badge!`, 'badge');
           addToast('New Badge!', `You earned: ${badge.name}`, 'success');
         }
       }
@@ -226,13 +238,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [apiAvailable, registeredUsers, updateStreak, addToast, fetchIssuesFromApi]);
 
   const registerUser = useCallback(async (name: string, email: string, password: string, role: 'Citizen' | 'Authority') => {
-    if (apiAvailable || getToken() || !getToken()) {
+    if (apiAvailable) {
       try {
         const res = await apiRegister(name, email, password, role);
         setToken(res.token);
         setUser(res.user);
         setApiAvailable(true);
-        setActiveTab(role === 'Authority' ? 'authority-dashboard' : 'dashboard');
+        setActiveTab(res.user.role === 'Authority' ? 'authority-dashboard' : 'dashboard');
         addToast('Account Created', `Welcome to Community Hero, ${name}!`, 'success');
         fetchIssuesFromApi();
         return;
@@ -247,7 +259,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       name,
       email,
       password,
-      role,
+      role: 'Citizen',
       points: 0,
       badges: [],
       avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${name}`,
@@ -260,7 +272,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
     setRegisteredUsers((prev) => [...prev, newUser]);
     setUser(newUser);
-    setActiveTab(role === 'Authority' ? 'authority-dashboard' : 'dashboard');
+    setActiveTab('dashboard');
     addToast('Account Created', `Welcome to Community Hero, ${name}!`, 'success');
     checkBadges(newUser);
   }, [apiAvailable, addToast, checkBadges, fetchIssuesFromApi]);
@@ -711,8 +723,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     toasts,
     addToast,
     removeToast,
+    isMobileMenuOpen,
+    setIsMobileMenuOpen,
     resetDemo,
-  }), [user, isAuthenticated, apiAvailable, loginUser, registerUser, logoutUser, activeTab, setActiveTab, selectedIssueId, navigateToIssue, issues, addIssue, upvoteIssue, verifyIssue, updateIssueStatus, addComment, hasUpvoted, hasVerified, chatMessages, sendChatMessage, clearChat, notifications, unreadCount, markNotificationRead, markAllNotificationsRead, searchQuery, setSearchQuery, toasts, addToast, removeToast, resetDemo]);
+  }), [user, isAuthenticated, apiAvailable, loginUser, registerUser, logoutUser, activeTab, setActiveTab, selectedIssueId, navigateToIssue, issues, addIssue, upvoteIssue, verifyIssue, updateIssueStatus, addComment, hasUpvoted, hasVerified, chatMessages, sendChatMessage, clearChat, notifications, unreadCount, markNotificationRead, markAllNotificationsRead, searchQuery, setSearchQuery, toasts, addToast, removeToast, isMobileMenuOpen, setIsMobileMenuOpen, resetDemo]);
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }

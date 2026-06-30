@@ -1,4 +1,5 @@
 import React, { Suspense, lazy } from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { useApp } from './context/AppContext';
 import { Navbar } from './components/Navbar';
 import { Sidebar } from './components/Sidebar';
@@ -28,33 +29,46 @@ function PageFallback() {
   );
 }
 
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, addToast } = useApp();
+  React.useEffect(() => {
+    if (!isAuthenticated) {
+      addToast('Sign In Required', 'Please sign in to access this feature.', 'warning');
+    }
+  }, [isAuthenticated, addToast]);
+  if (!isAuthenticated) return <Navigate to="/auth" replace />;
+  return <>{children}</>;
+}
+
 function AppContent() {
-  const { activeTab } = useApp();
+  const { activeTab } = useApp(); // Used by Navbar and Sidebar for active states
 
   const renderContent = () => {
-    switch (activeTab) {
-      case 'landing': return <LandingPage />;
-      case 'auth': return <AuthPage />;
-      case 'dashboard': return <CitizenDashboard />;
-      case 'authority-dashboard': return <AuthorityDashboard />;
-      case 'report': return <ReportIssuePage />;
-      case 'feed': return <CommunityFeed />;
-      case 'map': return <div className="h-[calc(100vh-100px)]"><MapWidget /></div>;
-      case 'ai-assistant': return <AIAssistantPage />;
-      case 'profile': return <ProfilePage />;
-      case 'issue-details': return <IssueDetailsPage />;
-      case 'leaderboard': return <LeaderboardPage />;
-      default: return <LandingPage />;
-    }
+    return (
+      <Routes>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/auth" element={<AuthPage />} />
+        <Route path="/dashboard" element={<ProtectedRoute><CitizenDashboard /></ProtectedRoute>} />
+        <Route path="/authority-dashboard" element={<ProtectedRoute><AuthorityDashboard /></ProtectedRoute>} />
+        <Route path="/report" element={<ProtectedRoute><ReportIssuePage /></ProtectedRoute>} />
+        <Route path="/feed" element={<CommunityFeed />} />
+        <Route path="/map" element={<ProtectedRoute><div className="h-[calc(100vh-100px)]"><MapWidget /></div></ProtectedRoute>} />
+        <Route path="/ai-assistant" element={<AIAssistantPage />} />
+        <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+        <Route path="/issue-details" element={<IssueDetailsPage />} />
+        <Route path="/leaderboard" element={<LeaderboardPage />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    );
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-200 selection:bg-indigo-500/30 relative flex flex-col">
+    <div className="min-h-screen bg-slate-950 text-slate-200 selection:bg-indigo-500/20 relative flex flex-col">
       {/* Dynamic Ambient Background */}
       <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden bg-slate-950">
-        <div className="absolute -top-[20%] -right-[10%] w-[50%] h-[50%] bg-indigo-600/20 rounded-full blur-[120px] animate-pulse" style={{ animationDuration: '8s' }}></div>
-        <div className="absolute top-[30%] -left-[10%] w-[40%] h-[40%] bg-purple-600/20 rounded-full blur-[120px] animate-pulse" style={{ animationDuration: '10s' }}></div>
-        <div className="absolute -bottom-[20%] right-[20%] w-[60%] h-[60%] bg-emerald-600/10 rounded-full blur-[140px] animate-pulse" style={{ animationDuration: '12s' }}></div>
+        <div className="absolute -top-[20%] -right-[10%] w-[50%] h-[50%] bg-indigo-300/24 rounded-full blur-[120px] animate-pulse" style={{ animationDuration: '8s' }}></div>
+        <div className="absolute top-[30%] -left-[10%] w-[40%] h-[40%] bg-violet-300/24 rounded-full blur-[120px] animate-pulse" style={{ animationDuration: '10s' }}></div>
+        <div className="absolute -bottom-[20%] right-[20%] w-[60%] h-[60%] bg-emerald-200/28 rounded-full blur-[140px] animate-pulse" style={{ animationDuration: '12s' }}></div>
         {/* Subtle grid pattern overlay */}
         <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxwYXRoIGQ9Ik0zNiAzOGMtMS4yMzggMC0yLjM2Ny0uMzE4LTMuMzIzLS44NjdMMzUgMzQuNTcyVjI2aC04djUuMzEzbC0yLjY1NiA1Ljg1M0EyMC4wNzQgMjAuMDc0IDAgMCAxIDE1IDI1LjE1NlYyMmg4djIuMTM4bDIuMjgzLTMuODQyQTE5LjkyNyAxOS45MjcgMCAwIDEgMjUgMTBjMy4zMyAwIDYuNDk4LjgyIDkuMzIzIDIuMzgyTDMyIDE0LjYyNlYyMmguOThjMS4xMzgtMi4xNDIgMy4yMjMtMy41IDUuNTItMy41IDEuMzQgMCAyLjU4Mi40NTYgMy41ODUgMS4yNDdsMi4xNC0zLjA2YTE5LjkyNyAxOS45MjcgMCAwIDEtMy4zMDItNS41NTNsLTIuNjU0IDMuNTEzQTIwLjA3NCAyMC4wNzQgMCAwIDEgNDggMjV2NWgtOHY1LjMyMmwyLjQwNCAzLjQxNUEyMC4wNzQgMjAuMDc0IDAgMCAxIDQxIDM4Yy0xLjM2IDAtMi42MzctLjMzNC0zLjgwOC0uOTI1TDM2LjgzIDM2LjVaIiBmaWxsPSIjZmZmZmZmIiBmaWxsLW9wYWNpdHk9IjAuMDMiLz48L2c+PC9zdmc+')] opacity-50"></div>
       </div>

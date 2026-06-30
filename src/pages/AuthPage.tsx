@@ -14,17 +14,26 @@ export function AuthPage() {
   const [regEmail, setRegEmail] = useState('');
   const [regPassword, setRegPassword] = useState('');
   const [regConfirm, setRegConfirm] = useState('');
-  const [regRole, setRegRole] = useState<'Citizen' | 'Authority'>('Citizen');
   
   const [showPassword, setShowPassword] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const fillDemoLogin = (role: 'Citizen' | 'Authority') => {
+    if (role === 'Authority') {
+      setEmail('admin@hero.com');
+      setPassword('admin123');
+      return;
+    }
+
+    setEmail('alex@hero.com');
+    setPassword('hero123');
+  };
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) {
       addToast('Error', 'Please enter email and password', 'error');
       return;
     }
-    const success = loginUser(email, password);
+    const success = await loginUser(email, password);
     if (!success) {
       addToast('Login Failed', 'Invalid email or password. Check demo credentials.', 'error');
     }
@@ -49,7 +58,7 @@ export function AuthPage() {
       return;
     }
     
-    registerUser(regName, regEmail, regPassword, regRole);
+    registerUser(regName, regEmail, regPassword, 'Citizen');
   };
 
   return (
@@ -98,6 +107,25 @@ export function AuthPage() {
                 onSubmit={handleLogin}
                 className="space-y-4"
               >
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => fillDemoLogin('Citizen')}
+                    className="bg-slate-800/60 hover:bg-slate-800 border border-slate-700 hover:border-indigo-500 text-slate-300 hover:text-white rounded-xl px-3 py-2.5 text-sm font-semibold transition-all flex items-center justify-center gap-2"
+                  >
+                    <UserIcon className="w-4 h-4 text-indigo-400" />
+                    Citizen Demo
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => fillDemoLogin('Authority')}
+                    className="bg-slate-800/60 hover:bg-slate-800 border border-slate-700 hover:border-purple-500 text-slate-300 hover:text-white rounded-xl px-3 py-2.5 text-sm font-semibold transition-all flex items-center justify-center gap-2"
+                  >
+                    <Building className="w-4 h-4 text-purple-400" />
+                    Authority Demo
+                  </button>
+                </div>
+
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-1.5">Email Address</label>
                   <div className="relative">
@@ -124,7 +152,7 @@ export function AuthPage() {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       className="w-full bg-slate-800/50 border border-slate-700 text-white rounded-xl pl-10 pr-10 py-2.5 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"
-                      placeholder="••••••••"
+                      placeholder="Password"
                     />
                     <button 
                       type="button"
@@ -153,28 +181,6 @@ export function AuthPage() {
                 onSubmit={handleRegister}
                 className="space-y-4"
               >
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">I am signing up as a:</label>
-                  <div className="grid grid-cols-2 gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setRegRole('Citizen')}
-                      className={`p-3 rounded-xl border flex flex-col items-center gap-2 transition-all ${regRole === 'Citizen' ? 'bg-indigo-500/20 border-indigo-500 text-indigo-300' : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:border-slate-500'}`}
-                    >
-                      <UserIcon className={regRole === 'Citizen' ? 'text-indigo-400' : ''} />
-                      <span className="text-sm font-semibold">Citizen</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setRegRole('Authority')}
-                      className={`p-3 rounded-xl border flex flex-col items-center gap-2 transition-all ${regRole === 'Authority' ? 'bg-purple-500/20 border-purple-500 text-purple-300' : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:border-slate-500'}`}
-                    >
-                      <Building className={regRole === 'Authority' ? 'text-purple-400' : ''} />
-                      <span className="text-sm font-semibold">Authority</span>
-                    </button>
-                  </div>
-                </div>
-
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-1.5">Full Name</label>
                   <div className="relative">
@@ -213,7 +219,7 @@ export function AuthPage() {
                         value={regPassword}
                         onChange={(e) => setRegPassword(e.target.value)}
                         className="w-full bg-slate-800/50 border border-slate-700 text-white text-sm rounded-xl pl-9 pr-3 py-2.5 focus:outline-none focus:border-indigo-500 transition-all"
-                        placeholder="••••••••"
+                        placeholder="Create password"
                       />
                     </div>
                   </div>
@@ -226,7 +232,7 @@ export function AuthPage() {
                         value={regConfirm}
                         onChange={(e) => setRegConfirm(e.target.value)}
                         className="w-full bg-slate-800/50 border border-slate-700 text-white text-sm rounded-xl pl-9 pr-3 py-2.5 focus:outline-none focus:border-indigo-500 transition-all"
-                        placeholder="••••••••"
+                        placeholder="Confirm password"
                       />
                     </div>
                   </div>
@@ -243,24 +249,6 @@ export function AuthPage() {
           </AnimatePresence>
         </div>
 
-        {/* Demo Credentials Box */}
-        <div className="mt-8 p-4 bg-indigo-900/20 border border-indigo-500/20 rounded-xl">
-          <h4 className="text-xs font-semibold text-indigo-300 uppercase tracking-wider mb-2 flex items-center justify-center gap-2">
-            <InfoIcon className="w-4 h-4" /> Demo Credentials
-          </h4>
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div className="bg-slate-900/50 p-2 rounded border border-slate-800">
-              <span className="block text-xs text-slate-400 mb-1">Citizen:</span>
-              <span className="text-white block">alex@hero.com</span>
-              <span className="text-white block font-mono">hero123</span>
-            </div>
-            <div className="bg-slate-900/50 p-2 rounded border border-slate-800">
-              <span className="block text-xs text-slate-400 mb-1">Authority:</span>
-              <span className="text-white block">admin@hero.com</span>
-              <span className="text-white block font-mono">admin123</span>
-            </div>
-          </div>
-        </div>
       </motion.div>
     </div>
   );

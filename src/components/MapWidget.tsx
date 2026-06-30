@@ -271,6 +271,23 @@ export function MapWidget() {
             height="100%"
             showControls={true}
           />
+          {filteredIssues.length === 0 && (
+            <div className="absolute inset-0 z-[350] flex items-center justify-center bg-slate-950/45 backdrop-blur-[2px] px-6">
+              <div className="text-center max-w-sm">
+                <div className="w-12 h-12 mx-auto mb-4 rounded-xl bg-slate-900/90 border border-slate-700 flex items-center justify-center text-indigo-300">
+                  <Map className="w-6 h-6" />
+                </div>
+                <h3 className="text-white font-bold mb-2">No Matching Reports</h3>
+                <p className="text-sm text-slate-300 mb-4">Try widening the category, severity, or status filters.</p>
+                <button
+                  onClick={resetFilters}
+                  className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold transition-colors"
+                >
+                  Reset Filters
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Live Activity Feed */}

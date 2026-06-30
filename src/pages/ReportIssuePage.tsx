@@ -43,10 +43,14 @@ export function ReportIssuePage() {
   useEffect(() => {
     if (step === 4) {
       const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-        const R = 6371e3; const φ1 = lat1 * Math.PI/180; const φ2 = lat2 * Math.PI/180;
-        const Δφ = (lat2-lat1) * Math.PI/180; const Δλ = (lon2-lon1) * Math.PI/180;
-        const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ/2) * Math.sin(Δλ/2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); return R * c;
+        const earthRadiusMeters = 6371e3;
+        const phi1 = lat1 * Math.PI / 180;
+        const phi2 = lat2 * Math.PI / 180;
+        const deltaPhi = (lat2 - lat1) * Math.PI / 180;
+        const deltaLambda = (lon2 - lon1) * Math.PI / 180;
+        const a = Math.sin(deltaPhi / 2) ** 2 + Math.cos(phi1) * Math.cos(phi2) * Math.sin(deltaLambda / 2) ** 2;
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return earthRadiusMeters * c;
       };
 
       const found = issues.find(i => 
@@ -331,7 +335,7 @@ export function ReportIssuePage() {
                         <Upload className="w-10 h-10 text-slate-400" />
                       </div>
                       <h3 className="text-lg font-semibold text-white mb-2">Drag & drop your photo or video</h3>
-                      <p className="text-sm text-slate-400 mb-6">Supports JPEG, PNG, MP4, WebM up to 50MB</p>
+                      <p className="text-sm text-slate-400 mb-6">Supports JPEG, PNG, MP4, WebM up to 8MB</p>
                       
                       <div className="flex flex-col sm:flex-row justify-center gap-4">
                         <label className="px-6 py-3 bg-slate-700 hover:bg-slate-600 text-white font-medium rounded-xl cursor-pointer transition-colors flex items-center justify-center gap-2">
@@ -471,7 +475,7 @@ export function ReportIssuePage() {
                     {location.lat !== 24.2742 && (
                       <div className="flex items-center gap-2 mt-2 text-xs text-emerald-400 bg-emerald-400/10 p-2 rounded-lg border border-emerald-400/20">
                         <CheckCircle2 size={14} />
-                        <span>📍 {location.lat.toFixed(5)}, {location.lng.toFixed(5)}</span>
+                        <span>{location.lat.toFixed(5)}, {location.lng.toFixed(5)}</span>
                       </div>
                     )}
                   </div>

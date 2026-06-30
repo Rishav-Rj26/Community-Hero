@@ -8,26 +8,29 @@ import {
 } from 'lucide-react';
 
 export function Sidebar() {
-  const { activeTab, setActiveTab, isAuthenticated, user, addToast, logoutUser, resetDemo } = useApp();
+  const { activeTab, setActiveTab, isAuthenticated, user, addToast, logoutUser, resetDemo, isMobileMenuOpen, setIsMobileMenuOpen } = useApp();
 
   const handleNavClick = (tab: AppTab, requiresAuth: boolean = false, adminOnly: boolean = false) => {
     if (requiresAuth && !isAuthenticated) {
       addToast('Sign In Required', 'Please sign in to access this feature.', 'warning');
       setActiveTab('auth');
+      setIsMobileMenuOpen(false);
       return;
     }
     if (adminOnly && (!isAuthenticated || user?.role !== 'Authority')) {
       addToast('Access Denied', 'This area is restricted to authorities.', 'error');
+      setIsMobileMenuOpen(false);
       return;
     }
     setActiveTab(tab);
+    setIsMobileMenuOpen(false);
   };
 
   const navItems = [
     { id: 'landing' as AppTab, label: 'Explore', icon: Compass, auth: false },
     { id: 'dashboard' as AppTab, label: 'Dashboard', icon: LayoutDashboard, auth: true },
     { id: 'report' as AppTab, label: 'Report Issue', icon: PlusCircle, auth: true },
-    { id: 'map' as AppTab, label: 'Live Map', icon: MapIcon, auth: false },
+    { id: 'map' as AppTab, label: 'Live Map', icon: MapIcon, auth: true },
     { id: 'feed' as AppTab, label: 'Community', icon: Rss, auth: false },
     { id: 'leaderboard' as AppTab, label: 'Leaderboard', icon: Trophy, auth: false },
     { id: 'ai-assistant' as AppTab, label: 'AI Assistant', icon: MessageSquare, auth: false },
@@ -36,7 +39,22 @@ export function Sidebar() {
   ];
 
   return (
-    <aside className="hidden md:flex flex-col w-64 h-screen fixed left-0 top-0 pt-20 pb-4 px-4 bg-slate-900/50 backdrop-blur-xl border-r border-slate-800 z-30">
+    <>
+      {/* Mobile Overlay */}
+      {isMobileMenuOpen && (
+        <div 
+          className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-40 md:hidden"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
+      
+      {/* Sidebar */}
+      <aside className={`
+        flex flex-col w-64 h-screen fixed left-0 top-0 pt-20 pb-4 px-4 
+        bg-slate-900/90 md:bg-slate-900/50 backdrop-blur-xl border-r border-slate-800 z-50
+        transition-transform duration-300 ease-in-out
+        ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+      `}>
       
       <div className="flex-1 overflow-y-auto py-4 scrollbar-hide space-y-1">
         {navItems.map((item) => {
@@ -120,5 +138,6 @@ export function Sidebar() {
         </button>
       </div>
     </aside>
+    </>
   );
 }

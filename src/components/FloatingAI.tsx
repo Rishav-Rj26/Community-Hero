@@ -13,8 +13,10 @@ export function FloatingAI() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
   // Voice recognition setup
-  const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-  const recognition = SpeechRecognition ? new SpeechRecognition() : null;
+  const recognition = React.useMemo(() => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    return SpeechRecognition ? new SpeechRecognition() : null;
+  }, []);
   
   useEffect(() => {
     if (recognition) {
@@ -154,9 +156,9 @@ export function FloatingAI() {
             {/* Quick Actions */}
             {displayMessages.length === 0 && (
               <div className="px-4 pb-2 flex gap-2 overflow-x-auto scrollbar-hide whitespace-nowrap">
-                <button onClick={() => handleActionClick('report')} className="text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 px-3 py-1.5 rounded-full transition-colors">📝 Report Issue</button>
-                <button onClick={() => handleActionClick('map')} className="text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 px-3 py-1.5 rounded-full transition-colors">🗺️ View Map</button>
-                <button onClick={() => handleActionClick('stats')} className="text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 px-3 py-1.5 rounded-full transition-colors">📊 My Stats</button>
+                <button onClick={() => handleActionClick('report')} className="text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 px-3 py-1.5 rounded-full transition-colors">Report Issue</button>
+                <button onClick={() => handleActionClick('map')} className="text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 px-3 py-1.5 rounded-full transition-colors">View Map</button>
+                <button onClick={() => handleActionClick('stats')} className="text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 px-3 py-1.5 rounded-full transition-colors">My Stats</button>
               </div>
             )}
 

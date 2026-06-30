@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useCallback } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import type { Issue } from '../types';
 
 declare const L: any;
@@ -45,6 +45,7 @@ export function LeafletMap({
   const heatLayerRef = useRef<any>(null);
   const pickMarkerRef = useRef<any>(null);
   const prevIssueIdsRef = useRef<Set<string>>(new Set());
+  const [isHeatmapVisible, setIsHeatmapVisible] = useState(false);
 
   useEffect(() => {
     if (!mapRef.current) return;
@@ -61,6 +62,10 @@ export function LeafletMap({
         attribution: '&copy; OpenStreetMap contributors',
         className: 'dark-tiles',
       }).addTo(mapInstanceRef.current);
+
+      requestAnimationFrame(() => {
+        mapInstanceRef.current?.invalidateSize();
+      });
 
       // User location
       if (navigator.geolocation) {
@@ -286,14 +291,25 @@ export function LeafletMap({
         map.removeLayer(heatLayerRef.current);
       }
       
-      heatLayerRef.current = L.heatLayer(heatData, { radius: 30, blur: 20, maxZoom: 15 });
+      heatLayerRef.current = L.heatLayer(heatData, {
+        radius: 38,
+        blur: 24,
+        maxZoom: 15,
+        minOpacity: 0.35,
+        gradient: {
+          0.2: '#38bdf8',
+          0.45: '#22c55e',
+          0.7: '#f59e0b',
+          1: '#ef4444',
+        },
+      });
       
-      if (showControls) {
+      if (showControls && isHeatmapVisible && heatData.length > 0) {
         map.addLayer(heatLayerRef.current);
       }
     }
 
-  }, [issues, selectedIssueId, onIssueClick, showControls]);
+  }, [issues, selectedIssueId, onIssueClick, showControls, isHeatmapVisible]);
 
   // Handle selected issue view centering
   useEffect(() => {
@@ -319,23 +335,16 @@ export function LeafletMap({
       {showControls && (
         <div className="absolute top-4 right-4 z-[400] bg-slate-900/90 backdrop-blur border border-slate-700 p-1.5 rounded-xl shadow-xl flex items-center">
            <button 
-             onClick={(e) => {
-               const btn = e.currentTarget;
-               if (!mapInstanceRef.current || !heatLayerRef.current) return;
-               if (mapInstanceRef.current.hasLayer(heatLayerRef.current)) {
-                 mapInstanceRef.current.removeLayer(heatLayerRef.current);
-                 btn.classList.remove('bg-indigo-600', 'text-white');
-                 btn.classList.add('bg-slate-800', 'text-slate-400');
-               } else {
-                 mapInstanceRef.current.addLayer(heatLayerRef.current);
-                 btn.classList.add('bg-indigo-600', 'text-white');
-                 btn.classList.remove('bg-slate-800', 'text-slate-400');
-               }
-             }}
-             className="text-xs font-bold text-white px-4 py-2 rounded-lg bg-indigo-600 hover:opacity-90 transition-all flex items-center gap-2"
+             onClick={() => setIsHeatmapVisible((visible) => !visible)}
+             disabled={issues.length === 0 || typeof L.heatLayer !== 'function'}
+             className={`text-xs font-bold px-4 py-2 rounded-lg transition-all flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-50 ${
+               isHeatmapVisible
+                 ? 'bg-indigo-600 text-white hover:opacity-90'
+                 : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+             }`}
            >
-             <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
-             Toggle Heatmap
+             <span className={`w-2 h-2 rounded-full bg-rose-500 ${isHeatmapVisible ? 'animate-pulse' : ''}`}></span>
+             {issues.length === 0 ? 'No Heat Data' : isHeatmapVisible ? 'Hide Heatmap' : 'Show Heatmap'}
            </button>
         </div>
       )}

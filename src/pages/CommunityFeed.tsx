@@ -215,7 +215,7 @@ export function CommunityFeed() {
                       <img src={issue.reporterAvatar} className="w-6 h-6 rounded-full bg-slate-800" alt="" />
                       <div className="text-xs">
                         <span className="text-white font-medium">{issue.reporterName}</span>
-                        <span className="text-slate-500 mx-1">•</span>
+                        <span className="text-slate-500 mx-1">/</span>
                         <span className="text-slate-500">{formatDistanceToNow(new Date(issue.createdAt), { addSuffix: true })}</span>
                       </div>
                     </div>

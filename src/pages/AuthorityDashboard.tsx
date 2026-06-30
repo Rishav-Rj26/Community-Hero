@@ -8,7 +8,7 @@ import { DEPARTMENTS } from '../data/mockData';
 import { formatDistanceToNow } from 'date-fns';
 
 export function AuthorityDashboard() {
-  const { user, issues, updateIssueStatus, navigateToIssue, addToast } = useApp();
+  const { user, issues, updateIssueStatus, navigateToIssue, addToast, setActiveTab } = useApp();
   const [activeDept, setActiveDept] = useState('All');
   
   const deptIssues = useMemo(() => {
@@ -190,7 +190,7 @@ export function AuthorityDashboard() {
               )}
             </div>
             
-            <button onClick={() => useApp().setActiveTab('feed')} className="w-full mt-4 py-2 flex items-center justify-center gap-2 text-sm text-purple-400 hover:text-purple-300 font-medium">
+            <button onClick={() => setActiveTab('feed')} className="w-full mt-4 py-2 flex items-center justify-center gap-2 text-sm text-purple-400 hover:text-purple-300 font-medium">
               View All Open Issues <ArrowRight size={16} />
             </button>
           </div>

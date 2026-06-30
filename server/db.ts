@@ -130,8 +130,12 @@ export function initDB() {
     CREATE INDEX IF NOT EXISTS idx_issues_status ON issues(status);
     CREATE INDEX IF NOT EXISTS idx_issues_category ON issues(category);
     CREATE INDEX IF NOT EXISTS idx_issues_severity ON issues(severity);
+    CREATE INDEX IF NOT EXISTS idx_issues_reporterId ON issues(reporterId);
     CREATE INDEX IF NOT EXISTS idx_comments_issue_createdAt ON comments(issueId, createdAt);
     CREATE INDEX IF NOT EXISTS idx_notifications_user_createdAt ON notifications(userId, createdAt DESC);
+    CREATE INDEX IF NOT EXISTS idx_timeline_issueId ON timeline_events(issueId);
+    CREATE INDEX IF NOT EXISTS idx_upvotes_issueId ON upvotes(issueId);
+    CREATE INDEX IF NOT EXISTS idx_verifications_issueId ON verifications(issueId);
   `);
 
   // Seed Data if empty
@@ -187,8 +191,8 @@ function seedDatabase() {
   insertUser.run('user-community-8', 'Karthik S', 'karthik@hero.com', citizenPassword, 'Citizen', 500, 'https://api.dicebear.com/7.x/avataaars/svg?seed=Karthik', '2026-06-20', 10, today, 12, 25, 25);
 
   // Seed Badges for Alex
-  insertBadge.run('badge-1', 'user-1', 'First Report', '🎯', 'Reported your first community issue', 'Report 1 issue', 1, '2025-12-01');
-  insertBadge.run('badge-2', 'user-1', 'Community Guardian', '🛡️', 'Verified 5 community issues', 'Verify 5 issues', 5, '2026-01-15');
+  insertBadge.run('badge-1', 'user-1', 'First Report', 'Target', 'Reported your first community issue', 'Report 1 issue', 1, '2025-12-01');
+  insertBadge.run('badge-2', 'user-1', 'Community Guardian', 'Shield', 'Verified 5 community issues', 'Verify 5 issues', 5, '2026-01-15');
 
   // Seed Issue 1
   insertIssue.run('issue-1', 'Deep Pothole on MG Road', 'A massive pothole has developed near the metro station, causing severe traffic slowdowns and posing a risk to two-wheelers.', 'Pothole', 'Critical', 'In Progress', 24.2792, 86.6413, 'MG Road, near Trinity Metro, Madhupur', 'https://picsum.photos/seed/pothole1/800/500', 0.95, 'Large structural anomaly on road surface detected. High risk of vehicular damage.', 'Roads & Infrastructure', 45, 12, 1, 'user-1', 'Alex Rivera', 'https://api.dicebear.com/7.x/avataaars/svg?seed=Alex', '2026-06-20T10:00:00Z', null, null);
@@ -229,4 +233,10 @@ export function resetDatabase() {
     DROP TABLE IF EXISTS users;
   `);
   initDB();
+}
+
+export function closeDatabase() {
+  if (!db.open) return;
+  db.pragma('wal_checkpoint(TRUNCATE)');
+  db.close();
 }

@@ -8,14 +8,13 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import dotenv from 'dotenv';
 import { GoogleGenAI } from '@google/genai';
-import { db, initDB, resetDatabase } from './db';
-import { authMiddleware, AuthRequest } from './middleware/auth';
+import { closeDatabase, db, initDB, resetDatabase } from './db';
+import { authMiddleware, AuthRequest, getJwtSecret } from './middleware/auth';
 
 dotenv.config();
 
 const app = express();
 const PORT = Number(process.env.SERVER_PORT || 3001);
-const JWT_SECRET = process.env.JWT_SECRET || 'community-hero-dev-secret-change-in-production';
 const API_KEY = process.env.GEMINI_API_KEY || '';
 const ISSUE_STATUSES = ['Reported', 'Under Review', 'In Progress', 'Resolved'] as const;
 const ISSUE_SEVERITIES = ['Low', 'Medium', 'High', 'Critical'] as const;
@@ -39,11 +38,32 @@ app.use((_req, res, next) => {
   res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
   next();
 });
-app.use(cors());
+
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:3000').split(',');
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  }
+}));
 app.use(express.json({ limit: '10mb' }));
 
 type RateLimitBucket = { count: number; resetAt: number };
 const rateLimitBuckets = new Map<string, RateLimitBucket>();
+
+// Periodic pruning of expired rate limit buckets to prevent memory leaks
+const rateLimitPruneInterval = setInterval(() => {
+  const now = Date.now();
+  for (const [key, bucket] of rateLimitBuckets.entries()) {
+    if (bucket.resetAt <= now) {
+      rateLimitBuckets.delete(key);
+    }
+  }
+}, 60000); // Clean up every minute
+rateLimitPruneInterval.unref?.();
 
 function rateLimit(options: { windowMs: number; max: number }) {
   return (req: Request, res: Response, next: NextFunction) => {
@@ -226,6 +246,63 @@ function fetchIssueDetails(issueId: string) {
   };
 }
 
+function fetchIssuesDetailsBulk(issueIds: string[]) {
+  if (issueIds.length === 0) return [];
+  const placeholders = issueIds.map(() => '?').join(',');
+  
+  const issues = db.prepare(`SELECT * FROM issues WHERE id IN (${placeholders})`).all(...issueIds) as DbIssue[];
+  const timelines = db.prepare(`SELECT status, date, description, actor, issueId FROM timeline_events WHERE issueId IN (${placeholders}) ORDER BY date ASC`).all(...issueIds) as any[];
+  const comments = db.prepare(`SELECT * FROM comments WHERE issueId IN (${placeholders}) ORDER BY createdAt ASC`).all(...issueIds) as any[];
+  const upvotes = db.prepare(`SELECT issueId, userId FROM upvotes WHERE issueId IN (${placeholders})`).all(...issueIds) as any[];
+  const verifications = db.prepare(`SELECT issueId, userId FROM verifications WHERE issueId IN (${placeholders})`).all(...issueIds) as any[];
+
+  const groupedTimelines = timelines.reduce((acc, t) => {
+    if (!acc[t.issueId]) acc[t.issueId] = [];
+    const { issueId, ...rest } = t;
+    acc[issueId].push(rest);
+    return acc;
+  }, {} as Record<string, any[]>);
+
+  const groupedComments = comments.reduce((acc, c) => {
+    if (!acc[c.issueId]) acc[c.issueId] = [];
+    acc[c.issueId].push(c);
+    return acc;
+  }, {} as Record<string, any[]>);
+
+  const groupedUpvotes = upvotes.reduce((acc, u) => {
+    if (!acc[u.issueId]) acc[u.issueId] = [];
+    acc[u.issueId].push(u.userId);
+    return acc;
+  }, {} as Record<string, string[]>);
+
+  const groupedVerifications = verifications.reduce((acc, v) => {
+    if (!acc[v.issueId]) acc[v.issueId] = [];
+    acc[v.issueId].push(v.userId);
+    return acc;
+  }, {} as Record<string, string[]>);
+
+  // Return them in the exact order of issueIds provided
+  const issuesById = issues.reduce((acc, i) => {
+    acc[i.id] = i;
+    return acc;
+  }, {} as Record<string, DbIssue>);
+
+  return issueIds.map(id => {
+    const issue = issuesById[id];
+    if (!issue) return null;
+    const { lat, lng, address, isVerifiedByAuthority, ...rest } = issue;
+    return {
+      ...rest,
+      location: { lat, lng, address },
+      isVerifiedByAuthority: Boolean(isVerifiedByAuthority),
+      timeline: groupedTimelines[id] || [],
+      comments: groupedComments[id] || [],
+      upvotedBy: groupedUpvotes[id] || [],
+      verifiedBy: groupedVerifications[id] || [],
+    };
+  }).filter(Boolean);
+}
+
 function getDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
   const earthRadiusMeters = 6371e3;
   const phi1 = lat1 * Math.PI / 180;
@@ -284,7 +361,7 @@ app.post('/api/auth/login', authRateLimit, (req, res) => {
     db.prepare('UPDATE users SET streak = ?, lastActiveDate = ? WHERE id = ?').run(newStreak, today, user.id);
   }
 
-  const token = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
+  const token = jwt.sign({ id: user.id, role: user.role }, getJwtSecret(), { expiresIn: '7d' });
   res.json({ token, user: getUserData(user.id) });
 });
 
@@ -293,7 +370,8 @@ app.post('/api/auth/register', authRateLimit, (req, res) => {
     const name = requireString(req.body.name, 'name', 80);
     const email = requireString(req.body.email, 'email', 120).toLowerCase();
     const password = requireString(req.body.password, 'password', 120);
-    const role = isOneOf(req.body.role, USER_ROLES) ? req.body.role : 'Citizen';
+    // Security: Only allow Authority registration via invite/admin flow. Force Citizen for public registration.
+    const role = 'Citizen';
 
     if (!/^\S+@\S+\.\S+$/.test(email)) return badRequest(res, 'A valid email is required');
     if (password.length < 6) return badRequest(res, 'Password must be at least 6 characters');
@@ -308,7 +386,7 @@ app.post('/api/auth/register', authRateLimit, (req, res) => {
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(id, name, email, hash, role, avatar, new Date().toISOString(), 1, today);
 
-    const token = jwt.sign({ id, role }, JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign({ id, role }, getJwtSecret(), { expiresIn: '7d' });
     res.status(201).json({ token, user: getUserData(id) });
   } catch (err: any) {
     if (err.message?.includes('UNIQUE constraint failed')) {
@@ -359,9 +437,15 @@ app.get('/api/issues', (req, res) => {
   }
   query += ' ORDER BY createdAt DESC';
 
+  const limit = Math.max(1, Math.min(100, Number(req.query.limit) || 50));
+  const page = Math.max(1, Number(req.query.page) || 1);
+  const offset = (page - 1) * limit;
+
+  query += ` LIMIT ${limit} OFFSET ${offset}`;
+
   const issueIds = db.prepare(query).all(...params).map((row: any) => row.id);
-  const issues = issueIds.map((id) => fetchIssueDetails(id)).filter(Boolean);
-  res.json({ issues });
+  const issues = fetchIssuesDetailsBulk(issueIds);
+  res.json({ issues, page, limit });
 });
 
 app.get('/api/issues/:id', (req, res) => {
@@ -504,10 +588,20 @@ app.post('/api/issues/:id/comments', authMiddleware, (req: AuthRequest, res) => 
   res.status(201).json({ comment: { id: commentId, authorId: user.id, authorName: user.name, authorAvatar: user.avatar, content, createdAt: now, role: user.role } });
 });
 
-app.get('/api/users/leaderboard', (_req, res) => {
-  const users = db.prepare('SELECT * FROM users WHERE role = "Citizen" ORDER BY points DESC').all() as SafeUser[];
+app.get('/api/users/leaderboard', (req, res) => {
+  const limit = Math.max(1, Math.min(100, Number(req.query.limit) || 20));
+  const page = Math.max(1, Number(req.query.page) || 1);
+  const offset = (page - 1) * limit;
+
+  const users = db.prepare(`
+    SELECT u.*, (SELECT COUNT(*) FROM badges b WHERE b.userId = u.id) as badgeCount
+    FROM users u
+    WHERE u.role = "Citizen"
+    ORDER BY u.points DESC
+    LIMIT ? OFFSET ?
+  `).all(limit, offset) as any[];
+
   const leaderboard = users.map((user, index) => {
-    const badgeRow = db.prepare('SELECT COUNT(*) as count FROM badges WHERE userId = ?').get(user.id) as { count: number };
     return {
       userId: user.id,
       name: user.name,
@@ -516,11 +610,11 @@ app.get('/api/users/leaderboard', (_req, res) => {
       level: Math.floor(user.points / 100) + 1,
       issuesReported: user.issuesReported,
       issuesVerified: user.issuesVerified,
-      badgeCount: badgeRow.count,
-      rank: index + 1,
+      badgeCount: user.badgeCount,
+      rank: offset + index + 1,
     };
   });
-  res.json({ leaderboard });
+  res.json({ leaderboard, page, limit });
 });
 
 app.get('/api/users/:id', (req, res) => {
@@ -675,6 +769,9 @@ app.put('/api/notifications/read-all', authMiddleware, (req: AuthRequest, res) =
 });
 
 app.post('/api/reset', authMiddleware, (req: AuthRequest, res) => {
+  if (process.env.NODE_ENV === 'production') {
+    return res.status(403).json({ error: 'Database reset is disabled in production' });
+  }
   if (req.user!.role !== 'Authority') return res.status(403).json({ error: 'Forbidden' });
   resetDatabase();
   res.json({ success: true });
@@ -695,6 +792,21 @@ app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   return res.status(500).json({ error: 'Server error' });
 });
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
+
+function shutdown() {
+  server.close(() => {
+    closeDatabase();
+    process.exit(0);
+  });
+
+  setTimeout(() => {
+    closeDatabase();
+    process.exit(1);
+  }, 5000).unref();
+}
+
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);

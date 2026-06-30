@@ -18,15 +18,12 @@ export function Navbar() {
     markNotificationRead,
     markAllNotificationsRead,
     navigateToIssue,
-    issues
+    isMobileMenuOpen,
+    setIsMobileMenuOpen
   } = useApp();
   
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
-  const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(new Set());
-
-  const criticalIssues = issues.filter(i => i.severity === 'Critical' && i.status === 'Reported' && !dismissedAlerts.has(i.id));
 
   const navRef = React.useRef<HTMLElement>(null);
   
@@ -58,33 +55,7 @@ export function Navbar() {
 
   return (
     <>
-      <AnimatePresence>
-        {criticalIssues.length > 0 && (
-          <motion.div 
-            initial={{ height: 0, opacity: 0 }} 
-            animate={{ height: 'auto', opacity: 1 }} 
-            exit={{ height: 0, opacity: 0 }}
-            className="fixed top-0 left-0 right-0 z-50 bg-rose-600 border-b border-rose-500 overflow-hidden"
-          >
-            <div className="max-w-6xl mx-auto px-4 py-2 flex items-center justify-between gap-4">
-              <div 
-                className="flex items-center gap-3 text-white text-sm font-medium cursor-pointer hover:underline truncate"
-                onClick={() => navigateToIssue(criticalIssues[0].id)}
-              >
-                <span className="flex h-5 w-5 shrink-0 animate-pulse bg-white/20 rounded-full items-center justify-center">🚨</span>
-                <span className="truncate">EMERGENCY: {criticalIssues[0].title} in {criticalIssues[0].location.address.split(',')[0]}</span>
-              </div>
-              <button 
-                onClick={() => setDismissedAlerts(prev => new Set(prev).add(criticalIssues[0].id))}
-                className="text-white/70 hover:text-white shrink-0"
-              >
-                <X size={16} />
-              </button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-      <nav ref={navRef} className={`fixed left-0 right-0 h-16 bg-slate-900/80 backdrop-blur-xl border-b border-slate-800 z-40 px-4 flex items-center justify-between transition-all duration-300 ${criticalIssues.length > 0 ? 'top-[36px]' : 'top-0'}`}>
+      <nav ref={navRef} className={`fixed left-0 right-0 h-16 bg-slate-900/80 backdrop-blur-xl border-b border-slate-800 z-40 px-4 flex items-center justify-between transition-all duration-300 top-0`}>
         {/* Logo & Mobile Menu */}
         <div className="flex items-center gap-4">
         <button 
