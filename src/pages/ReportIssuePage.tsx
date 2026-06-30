@@ -94,14 +94,17 @@ export function ReportIssuePage() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
       streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-      }
       setIsCameraOpen(true);
     } catch (err) {
       addToast('Camera Error', 'Could not access camera. Please use file upload.', 'error');
     }
   };
+
+  useEffect(() => {
+    if (isCameraOpen && videoRef.current && streamRef.current) {
+      videoRef.current.srcObject = streamRef.current;
+    }
+  }, [isCameraOpen]);
 
   const capturePhoto = () => {
     if (videoRef.current) {
@@ -340,7 +343,7 @@ export function ReportIssuePage() {
                       <div className="flex flex-col sm:flex-row justify-center gap-4">
                         <label className="px-6 py-3 bg-slate-700 hover:bg-slate-600 text-white font-medium rounded-xl cursor-pointer transition-colors flex items-center justify-center gap-2">
                           <Upload size={18} /> Browse Files
-                          <input type="file" className="hidden" accept="image/*,video/*" onChange={handleFileUpload} />
+                          <input type="file" className="hidden" accept="image/*,video/*" capture="environment" onChange={handleFileUpload} />
                         </label>
                         <button onClick={openCamera} className="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-xl transition-colors flex items-center justify-center gap-2">
                           <Camera size={18} /> Take Photo

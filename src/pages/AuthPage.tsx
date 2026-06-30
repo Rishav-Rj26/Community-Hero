@@ -14,6 +14,7 @@ export function AuthPage() {
   const [regEmail, setRegEmail] = useState('');
   const [regPassword, setRegPassword] = useState('');
   const [regConfirm, setRegConfirm] = useState('');
+  const [regRole, setRegRole] = useState<'Citizen' | 'Authority'>('Citizen');
   
   const [showPassword, setShowPassword] = useState(false);
 
@@ -58,7 +59,7 @@ export function AuthPage() {
       return;
     }
     
-    registerUser(regName, regEmail, regPassword, 'Citizen');
+    registerUser(regName, regEmail, regPassword, regRole);
   };
 
   return (
@@ -107,25 +108,6 @@ export function AuthPage() {
                 onSubmit={handleLogin}
                 className="space-y-4"
               >
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => fillDemoLogin('Citizen')}
-                    className="bg-slate-800/60 hover:bg-slate-800 border border-slate-700 hover:border-indigo-500 text-slate-300 hover:text-white rounded-xl px-3 py-2.5 text-sm font-semibold transition-all flex items-center justify-center gap-2"
-                  >
-                    <UserIcon className="w-4 h-4 text-indigo-400" />
-                    Citizen Demo
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => fillDemoLogin('Authority')}
-                    className="bg-slate-800/60 hover:bg-slate-800 border border-slate-700 hover:border-purple-500 text-slate-300 hover:text-white rounded-xl px-3 py-2.5 text-sm font-semibold transition-all flex items-center justify-center gap-2"
-                  >
-                    <Building className="w-4 h-4 text-purple-400" />
-                    Authority Demo
-                  </button>
-                </div>
-
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-1.5">Email Address</label>
                   <div className="relative">
@@ -181,6 +163,25 @@ export function AuthPage() {
                 onSubmit={handleRegister}
                 className="space-y-4"
               >
+                <div className="grid grid-cols-2 gap-3 mb-2">
+                  <button
+                    type="button"
+                    onClick={() => setRegRole('Citizen')}
+                    className={`border rounded-xl px-3 py-2.5 text-sm font-semibold transition-all flex items-center justify-center gap-2 ${regRole === 'Citizen' ? 'bg-indigo-600 border-indigo-500 text-white shadow-md shadow-indigo-500/20' : 'bg-slate-800/60 border-slate-700 text-slate-400 hover:text-slate-300'}`}
+                  >
+                    <UserIcon className="w-4 h-4" />
+                    Citizen
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRegRole('Authority')}
+                    className={`border rounded-xl px-3 py-2.5 text-sm font-semibold transition-all flex items-center justify-center gap-2 ${regRole === 'Authority' ? 'bg-purple-600 border-purple-500 text-white shadow-md shadow-purple-500/20' : 'bg-slate-800/60 border-slate-700 text-slate-400 hover:text-slate-300'}`}
+                  >
+                    <Building className="w-4 h-4" />
+                    Authority
+                  </button>
+                </div>
+
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-1.5">Full Name</label>
                   <div className="relative">
